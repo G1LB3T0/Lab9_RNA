@@ -57,3 +57,48 @@ cat("Filas entrenamiento:", nrow(train_modelo), "\n")
 cat("Filas prueba:       ", nrow(test_modelo),  "\n")
 ```
 Para garantizar comparabilidad con todos los modelos desarrollados a lo largo del curso, se reutilizaron exactamente los mismos conjuntos de entrenamiento y prueba generados desde el Laboratorio 3. Utilizando set.seed(123) y una división 80/20, el conjunto de entrenamiento quedó con 48,442 observaciones y el de prueba con 12,173, ambos con las mismas 6 variables que son price, accommodates, bedrooms, bathrooms, number_of_reviews y review_scores_rating, aplicando los mismos filtros de precio menor a $1,000 y habitaciones menores o iguales a 10. Mantener estas condiciones idénticas es fundamental para que cualquier diferencia en el desempeño de las Redes Neuronales respecto a los algoritmos anteriores sea atribuible al modelo y no a los datos.
+
+# Variable de respuesta
+```{r variable-respuesta-rna}
+# Mismos cortes P33=136 y P67=250 de todos los labs anteriores
+precios_validos <- listings_clean_comp %>%
+  filter(!is.na(price), price > 0, price < 1000) %>%
+  pull(price)
+
+p33 <- quantile(precios_validos, 0.33)
+p67 <- quantile(precios_validos, 0.67)
+cat("P33:", round(p33, 2), "| P67:", round(p67, 2), "\n")
+
+# Crear variable categórica en train y test
+train_rna <- train_modelo %>%
+  mutate(
+    precio_cat = case_when(
+      price <= p33 ~ "barata",
+      price <= p67 ~ "media",
+      TRUE         ~ "cara"
+    ) %>% as.factor()
+  ) %>%
+  select(-price)
+
+test_rna <- test_modelo %>%
+  mutate(
+    precio_cat = case_when(
+      price <= p33 ~ "barata",
+      price <= p67 ~ "media",
+      TRUE         ~ "cara"
+    ) %>% as.factor()
+  ) %>%
+  select(-price)
+
+cat("\nDistribución entrenamiento:\n")
+print(table(train_rna$precio_cat))
+cat("\nDistribución prueba:\n")
+print(table(test_rna$precio_cat))
+
+# Muestra reducida para RNA (viabilidad computacional)
+set.seed(123)
+idx_muestra <- sample(nrow(train_rna), 5000)
+train_rna_m <- train_rna[idx_muestra, ]
+cat("\nMuestra de entrenamiento para RNA:", nrow(train_rna_m), "filas\n")
+```
+Se definió la variable respuesta categórica utilizando los mismos puntos de corte P33=136 y P67=250 establecidos desde el Laboratorio 4, garantizando consistencia con todos los modelos anteriores. Las propiedades se clasifican en tres categorías que son barata (precio ≤136), media (136-250) y cara (>250). La distribución es balanceada en ambos conjuntos en entrenamiento hay 16,789 baratas, 14,963 caras y 16,690 medias, y en prueba 4,167 baratas, 3,741 caras y 4,265 medias, lo cual es favorable para el entrenamiento de las redes neuronales ya que ninguna clase domina sobre las demás. Al igual que con SVM, se utilizará una muestra aleatoria de 5,000 observaciones del conjunto de entrenamiento con set.seed(123) para garantizar viabilidad computacional y reproducibilidad.
