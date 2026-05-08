@@ -1,0 +1,59 @@
+---
+title: "LAB9_RNA"
+author: "Luis Gilberto González  Joel Antonio Jaquez   Fabian Morales"
+date: "2026-05-08"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r librerias-rna}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(caret)
+library(nnet)
+```
+
+```{r carga-datos-rna}
+load("datos/listings.RData")
+```
+
+# Conjunto de entrenamiento y prueba
+```{r preprocesamiento-rna}
+# set.seed(123), split 80/20, mismas 6 variables y filtros
+listings_clean_comp <- listings %>%
+  mutate(price = parse_number(price)) %>%
+  select(-c(listing_url, scrape_id, picture_url, host_url,
+            host_thumbnail_url, host_picture_url, description,
+            neighborhood_overview, host_about, amenities))
+
+set.seed(123)
+total_filas  <- nrow(listings_clean_comp)
+indice_train <- sample(1:total_filas, size = 0.8 * total_filas)
+train_comp   <- listings_clean_comp[ indice_train, ]
+test_comp    <- listings_clean_comp[-indice_train, ]
+
+train_modelo <- train_comp %>%
+  filter(!is.na(price), price < 1000,
+         !is.na(bedrooms), bedrooms <= 10,
+         !is.na(bathrooms), !is.na(accommodates)) %>%
+  select(price, accommodates, bedrooms, bathrooms,
+         number_of_reviews, review_scores_rating) %>%
+  drop_na()
+
+test_modelo <- test_comp %>%
+  filter(!is.na(price), price < 1000,
+         !is.na(bedrooms), bedrooms <= 10,
+         !is.na(bathrooms), !is.na(accommodates)) %>%
+  select(price, accommodates, bedrooms, bathrooms,
+         number_of_reviews, review_scores_rating) %>%
+  drop_na()
+
+cat("Filas entrenamiento:", nrow(train_modelo), "\n")
+cat("Filas prueba:       ", nrow(test_modelo),  "\n")
+```
+Para garantizar comparabilidad con todos los modelos desarrollados a lo largo del curso, se reutilizaron exactamente los mismos conjuntos de entrenamiento y prueba generados desde el Laboratorio 3. Utilizando set.seed(123) y una división 80/20, el conjunto de entrenamiento quedó con 48,442 observaciones y el de prueba con 12,173, ambos con las mismas 6 variables que son price, accommodates, bedrooms, bathrooms, number_of_reviews y review_scores_rating, aplicando los mismos filtros de precio menor a $1,000 y habitaciones menores o iguales a 10. Mantener estas condiciones idénticas es fundamental para que cualquier diferencia en el desempeño de las Redes Neuronales respecto a los algoritmos anteriores sea atribuible al modelo y no a los datos.
