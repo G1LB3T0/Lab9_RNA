@@ -149,5 +149,135 @@ print(modelo_rna2)
 ```
 El segundo modelo de RNA fue construido usando caret con method="nnet" y validación cruzada de 10 pliegues, lo que lo hace más robusto que el modelo 1 al evaluar su desempeño en diferentes subconjuntos de los datos. La arquitectura utilizada es 5-10-3 que son 5 variables de entrada, 1 capa oculta con 10 neuronas (el doble que el modelo 1) y 3 neuronas de salida con función softmax para clasificación multiclase. Se usó un decay de 0.1, una regularización más fuerte que el modelo 1 (5e-4), para compensar la mayor complejidad de la red y evitar sobreajuste. Con 300 iteraciones máximas el modelo tuvo más oportunidades de converger que el anterior. Los resultados de la validación cruzada muestran un Accuracy de 58.74% y un Kappa de 0.3800, métricas que servirán de referencia para comparar con el modelo 1 en la actividad siguiente.
 
+# Actividad 4: Predicciones con ambos modelos
 
+```{r rna-predicciones}
+
+# Modelo 1: nnet directo
+pred_prob1 <- predict(modelo_rna1, newdata = test_rna, type = "raw")
+pred_rna1  <- apply(pred_prob1, 1, function(x) colnames(pred_prob1)[which.max(x)])
+pred_rna1  <- as.factor(pred_rna1)
+
+# Modelo 2: caret nnet
+pred_rna2 <- predict(modelo_rna2, newdata = test_rna)
+
+# Accuracy de cada modelo
+acc_rna1 <- mean(pred_rna1 == test_rna$precio_cat) * 100
+acc_rna2 <- mean(pred_rna2 == test_rna$precio_cat) * 100
+
+cat("===== Accuracy – Conjunto de Prueba =====\n")
+cat(sprintf("Modelo 1 (5 neuronas,  decay=5e-4): %.2f%%\n", acc_rna1))
+cat(sprintf("Modelo 2 (10 neuronas, decay=0.1) : %.2f%%\n", acc_rna2))
+```
+Ambos modelos muestran un desempeño similar sobre el conjunto de prueba. El Modelo 2 con 10 neuronas y decay=0.1 obtuvo el mejor Accuracy con 59.02%, superando ligeramente al Modelo 1 con 5 neuronas y decay=5e-4 que alcanzó 58.51%. La diferencia de apenas 0.51 puntos porcentuales indica que duplicar el número de neuronas no generó una mejora sustancial, lo que sugiere que la limitación no está en la capacidad de la red sino en las variables disponibles. Ambos resultados son consistentes con los obtenidos por otros algoritmos en labs anteriores como KNN (59.37%) y SVM Tuneado (58.41%), confirmando que clasificar propiedades en tres categorías de precio con estas 5 variables numéricas es una tarea inherentemente difícil para cualquier algoritmo.
+
+# Actividad 5: Matrices de confusión
+
+```{r rna-confusion-m1}
+
+# Modelo 1
+cm_rna1 <- confusionMatrix(pred_rna1, test_rna$precio_cat)
+print(cm_rna1)
+
+# Visualización Modelo 1
+as.data.frame(cm_rna1$table) %>%
+  ggplot(aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), fontface = "bold", size = 6) +
+  scale_fill_gradient(low = "#E3F2FD", high = "#1565C0") +
+  labs(title    = "Matriz de Confusión – RNA Modelo 1",
+       subtitle = "1 capa oculta | 5 neuronas | decay=5e-4",
+       x = "Categoría real", y = "Categoría predicha") +
+  theme_minimal()
+```
+
+```{r rna-confusion-m2}
+# Modelo 2
+cm_rna2 <- confusionMatrix(pred_rna2, test_rna$precio_cat)
+print(cm_rna2)
+
+# Visualización Modelo 2
+as.data.frame(cm_rna2$table) %>%
+  ggplot(aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), fontface = "bold", size = 6) +
+  scale_fill_gradient(low = "#E3F2FD", high = "#1565C0") +
+  labs(title    = "Matriz de Confusión – RNA Modelo 2",
+       subtitle = "1 capa oculta | 10 neuronas | decay=0.1 | CV 10-fold",
+       x = "Categoría real", y = "Categoría predicha") +
+  theme_minimal()
+```
+
+Las matrices de confusión revelan un comportamiento muy similar entre ambos modelos. El Modelo 2 (10 neuronas, decay=0.1) obtuvo el mejor Accuracy con 59.02% y Kappa de 0.3851, superando ligeramente al Modelo 1 (5 neuronas, decay=5e-4) con 58.51% y Kappa de 0.3771.
+
+Ambos modelos comparten el mismo patrón de errores observado en todos los algoritmos anteriores: identifican razonablemente bien las propiedades baratas (Sensibilidad ~68%) y caras (Sensibilidad ~64-67%), pero fallan consistentemente con las medias (Sensibilidad ~43%), que siguen siendo la categoría más difícil de clasificar para cualquier algoritmo. Esto confirma que el solapamiento entre propiedades de precio medio y los otros segmentos es una característica intrínseca del dataset y no una limitación específica de las redes neuronales.
+
+Desde la perspectiva de SmartStay Advisors, el error más grave en ambos modelos es clasificar propiedades caras como baratas: el Modelo 1 comete 346 de estos errores y el Modelo 2 también 346, un número idéntico que sugiere que ambas arquitecturas tienen dificultades similares en ese segmento específico del mercado.
+
+# Actividad 6: Comparación entre los 2 modelos RNA
+
+```{r rna-comparacion}
+
+# Tabla de métricas
+comparacion_rna <- data.frame(
+  Modelo      = c("RNA Modelo 1 (5 neuronas, decay=5e-4)",
+                  "RNA Modelo 2 (10 neuronas, decay=0.1)"),
+  Accuracy    = c(58.51, 59.02),
+  Kappa       = c(0.3771, 0.3851),
+  Sens_barata = c(68.32, 67.72),
+  Sens_cara   = c(64.42, 67.31),
+  Sens_media  = c(43.75, 43.24)
+)
+
+print(comparacion_rna)
+
+# Gráfico comparativo de Accuracy
+ggplot(comparacion_rna,
+       aes(x = Modelo, y = Accuracy, fill = Modelo)) +
+  geom_col(show.legend = FALSE, width = 0.5) +
+  geom_text(aes(label = paste0(Accuracy, "%")),
+            vjust = -0.5, fontface = "bold") +
+  ylim(0, 80) +
+  labs(title    = "Comparación de Accuracy – Modelos RNA",
+       subtitle = "Mayor Accuracy = mejor clasificación",
+       x = NULL, y = "Accuracy (%)") +
+  theme_minimal()
+```
+
+```{r rna-tiempo}
+# Tiempo de procesamiento
+t_m1 <- system.time(
+  nnet(precio_cat ~ ., data = train_rna_m,
+       size = 5, decay = 5e-4, maxit = 200, trace = FALSE)
+)
+
+t_m2 <- system.time(
+  nnet(precio_cat ~ ., data = train_rna_m,
+       size = 10, decay = 0.1, maxit = 300, trace = FALSE)
+)
+
+tiempo_rna <- data.frame(
+  Modelo = c("Modelo 1 (5 neuronas)",
+             "Modelo 2 (10 neuronas)"),
+  Tiempo = round(c(t_m1["elapsed"],
+                   t_m2["elapsed"]), 2)
+)
+
+print(tiempo_rna)
+
+ggplot(tiempo_rna, aes(x = Modelo, y = Tiempo, fill = Modelo)) +
+  geom_col(show.legend = FALSE, width = 0.5) +
+  geom_text(aes(label = paste0(Tiempo, "s")),
+            vjust = -0.5, fontface = "bold") +
+  ylim(0, max(tiempo_rna$Tiempo) * 1.3) +
+  labs(title = "Tiempo de procesamiento – Modelos RNA",
+       x = NULL, y = "Segundos") +
+  theme_minimal()
+```
+
+La comparación entre los dos modelos RNA muestra que el Modelo 2 es superior en todas las métricas de clasificación. Con 59.02% de Accuracy y Kappa de 0.3851 supera al Modelo 1 (58.51%, Kappa 0.3771), aunque la diferencia es pequeña. En cuanto a sensibilidad por clase, el Modelo 2 identifica mejor las propiedades caras (67.31% vs 64.42%) mientras que el Modelo 1 tiene una ligera ventaja en baratas (68.32% vs 67.72%). Ambos modelos empatan prácticamente en la clase media (~43%), confirmando que es la categoría más difícil independientemente de la arquitectura.
+
+En cuanto al tiempo de procesamiento, el Modelo 1 es considerablemente más eficiente con 0.66 segundos frente a los 1.17 segundos del Modelo 2, casi el doble. Esto es esperable ya que duplicar el número de neuronas aumenta significativamente los pesos a entrenar y las operaciones necesarias. Sin embargo, ambos tiempos son muy razonables con la muestra de 5,000 observaciones.
+
+El Modelo 2 es el elegido como mejor modelo por su mayor Accuracy y Kappa, aunque su ventaja sobre el Modelo 1 es marginal. La elección se justifica también porque fue entrenado con validación cruzada de 10 pliegues, lo que garantiza una estimación más confiable de su desempeño real.
 
