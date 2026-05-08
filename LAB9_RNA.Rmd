@@ -102,3 +102,52 @@ train_rna_m <- train_rna[idx_muestra, ]
 cat("\nMuestra de entrenamiento para RNA:", nrow(train_rna_m), "filas\n")
 ```
 Se definió la variable respuesta categórica utilizando los mismos puntos de corte P33=136 y P67=250 establecidos desde el Laboratorio 4, garantizando consistencia con todos los modelos anteriores. Las propiedades se clasifican en tres categorías que son barata (precio ≤136), media (136-250) y cara (>250). La distribución es balanceada en ambos conjuntos en entrenamiento hay 16,789 baratas, 14,963 caras y 16,690 medias, y en prueba 4,167 baratas, 3,741 caras y 4,265 medias, lo cual es favorable para el entrenamiento de las redes neuronales ya que ninguna clase domina sobre las demás. Al igual que con SVM, se utilizará una muestra aleatoria de 5,000 observaciones del conjunto de entrenamiento con set.seed(123) para garantizar viabilidad computacional y reproducibilidad.
+
+# Modelo 1
+```{r rna-modelo1}
+# nnet directo
+# Topología: 1 capa oculta con 5 neuronas
+# Función de activación: logística (por defecto en nnet)
+set.seed(123)
+modelo_rna1 <- nnet(precio_cat ~ .,
+                    data   = train_rna_m,
+                    size   = 5,       # neuronas en capa oculta
+                    decay  = 5e-4,    # regularización
+                    maxit  = 200,     # iteraciones máximas
+                    trace  = FALSE)
+
+cat("=== Modelo 1 – nnet (1 capa, 5 neuronas, logística) ===\n")
+print(modelo_rna1)
+```
+El primer modelo de RNA fue construido usando el paquete nnet con una arquitectura 5-5-3, 5 variables de entrada, 1 capa oculta con 5 neuronas y 3 neuronas de salida (una por cada categoría de precio). El modelo tiene en total 48 pesos a entrenar, lo que lo convierte en una red relativamente simple. La función de activación utilizada es logística (sigmoide) en la capa oculta, y softmax en la capa de salida, lo cual es la configuración estándar para clasificación multiclase ya que softmax convierte las salidas en probabilidades que suman 1, permitiendo asignar cada propiedad a la categoría más probable. Se utilizó un decay de 5e-4 como regularización para evitar sobreajuste y un máximo de 200 iteraciones para el entrenamiento.
+
+# Modelo 2
+```{r rna-modelo2}
+# caret con nnet y validación cruzada
+# Topología: más neuronas, con CV 10-fold
+# Función de activación: logística con diferente decay
+ctrl_rna <- trainControl(method  = "cv",
+                         number  = 10,
+                         verbose = FALSE)
+
+grid_rna <- expand.grid(
+  size  = 10,      # más neuronas que modelo 1
+  decay = 0.1      # mayor regularización
+)
+
+set.seed(123)
+modelo_rna2 <- train(precio_cat ~ .,
+                     data      = train_rna_m,
+                     method    = "nnet",
+                     trControl = ctrl_rna,
+                     tuneGrid  = grid_rna,
+                     trace     = FALSE,
+                     maxit     = 300)   # más iteraciones
+
+cat("=== Modelo 2 – caret nnet (1 capa, 10 neuronas, CV 10-fold) ===\n")
+print(modelo_rna2)
+```
+El segundo modelo de RNA fue construido usando caret con method="nnet" y validación cruzada de 10 pliegues, lo que lo hace más robusto que el modelo 1 al evaluar su desempeño en diferentes subconjuntos de los datos. La arquitectura utilizada es 5-10-3 que son 5 variables de entrada, 1 capa oculta con 10 neuronas (el doble que el modelo 1) y 3 neuronas de salida con función softmax para clasificación multiclase. Se usó un decay de 0.1, una regularización más fuerte que el modelo 1 (5e-4), para compensar la mayor complejidad de la red y evitar sobreajuste. Con 300 iteraciones máximas el modelo tuvo más oportunidades de converger que el anterior. Los resultados de la validación cruzada muestran un Accuracy de 58.74% y un Kappa de 0.3800, métricas que servirán de referencia para comparar con el modelo 1 en la actividad siguiente.
+
+
+
