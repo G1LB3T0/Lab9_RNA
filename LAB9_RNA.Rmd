@@ -2,7 +2,9 @@
 title: "LAB9_RNA"
 author: "Luis Gilberto González  Joel Antonio Jaquez   Fabian Morales"
 date: "2026-05-08"
-output: pdf_document
+output:
+  pdf_document:
+    latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
@@ -101,7 +103,7 @@ idx_muestra <- sample(nrow(train_rna), 5000)
 train_rna_m <- train_rna[idx_muestra, ]
 cat("\nMuestra de entrenamiento para RNA:", nrow(train_rna_m), "filas\n")
 ```
-Se definió la variable respuesta categórica utilizando los mismos puntos de corte P33=136 y P67=250 establecidos desde el Laboratorio 4, garantizando consistencia con todos los modelos anteriores. Las propiedades se clasifican en tres categorías que son barata (precio ≤136), media (136-250) y cara (>250). La distribución es balanceada en ambos conjuntos en entrenamiento hay 16,789 baratas, 14,963 caras y 16,690 medias, y en prueba 4,167 baratas, 3,741 caras y 4,265 medias, lo cual es favorable para el entrenamiento de las redes neuronales ya que ninguna clase domina sobre las demás. Al igual que con SVM, se utilizará una muestra aleatoria de 5,000 observaciones del conjunto de entrenamiento con set.seed(123) para garantizar viabilidad computacional y reproducibilidad.
+Se definió la variable respuesta categórica utilizando los mismos puntos de corte P33=136 y P67=250 establecidos desde el Laboratorio 4, garantizando consistencia con todos los modelos anteriores. Las propiedades se clasifican en tres categorías que son barata (precio <136), media (136-250) y cara (>250). La distribución es balanceada en ambos conjuntos en entrenamiento hay 16,789 baratas, 14,963 caras y 16,690 medias, y en prueba 4,167 baratas, 3,741 caras y 4,265 medias, lo cual es favorable para el entrenamiento de las redes neuronales ya que ninguna clase domina sobre las demás. Al igual que con SVM, se utilizará una muestra aleatoria de 5,000 observaciones del conjunto de entrenamiento con set.seed(123) para garantizar viabilidad computacional y reproducibilidad.
 
 # Modelo 1
 ```{r rna-modelo1}
@@ -280,4 +282,104 @@ La comparación entre los dos modelos RNA muestra que el Modelo 2 es superior en
 En cuanto al tiempo de procesamiento, el Modelo 1 es considerablemente más eficiente con 0.66 segundos frente a los 1.17 segundos del Modelo 2, casi el doble. Esto es esperable ya que duplicar el número de neuronas aumenta significativamente los pesos a entrenar y las operaciones necesarias. Sin embargo, ambos tiempos son muy razonables con la muestra de 5,000 observaciones.
 
 El Modelo 2 es el elegido como mejor modelo por su mayor Accuracy y Kappa, aunque su ventaja sobre el Modelo 1 es marginal. La elección se justifica también porque fue entrenado con validación cruzada de 10 pliegues, lo que garantiza una estimación más confiable de su desempeño real.
+
+# 7. Analice si no hay sobreajuste en los modelos.
+```{r}
+pred_train_rna1 <- predict(modelo_rna1, newdata = train_rna_m, type = "raw")
+pred_train_rna1 <- apply(pred_train_rna1, 1,
+                         function(x) colnames(pred_train_rna1)[which.max(x)])
+pred_train_rna1 <- as.factor(pred_train_rna1)
+
+pred_train_rna2 <- predict(modelo_rna2, newdata = train_rna_m)
+
+# Accuracy
+acc_train_rna1 <- mean(pred_train_rna1 == train_rna_m$precio_cat) * 100
+acc_train_rna2 <- mean(pred_train_rna2 == train_rna_m$precio_cat) * 100
+
+
+sobreajuste_rna <- data.frame(
+  Modelo      = c("Modelo 1 (5 neuronas)", "Modelo 2 (10 neuronas)"),
+  Acc_Train   = round(c(acc_train_rna1, acc_train_rna2), 2),
+  Acc_Test    = c(58.51, 59.02),
+  Diferencia  = round(c(acc_train_rna1 - 58.51,
+                        acc_train_rna2 - 59.02), 2)
+)
+
+cat("=== Análisis de Sobreajuste – Train vs Test ===\n")
+print(sobreajuste_rna)
+
+
+sobreajuste_long <- sobreajuste_rna %>%
+  select(Modelo, Acc_Train, Acc_Test) %>%
+  pivot_longer(cols = c(Acc_Train, Acc_Test),
+               names_to  = "Conjunto",
+               values_to = "Accuracy") %>%
+  mutate(Conjunto = recode(Conjunto,
+                           "Acc_Train" = "Entrenamiento",
+                           "Acc_Test"  = "Prueba"))
+
+ggplot(sobreajuste_long,
+       aes(x = Modelo, y = Accuracy, fill = Conjunto)) +
+  geom_col(position = "dodge", width = 0.5) +
+  geom_text(aes(label = paste0(Accuracy, "%")),
+            position = position_dodge(width = 0.5),
+            vjust = -0.5, fontface = "bold", size = 3.5) +
+  ylim(0, 80) +
+  scale_fill_manual(values = c("Entrenamiento" = "#1565C0",
+                               "Prueba"        = "#E15759")) +
+  labs(title    = "Análisis de Sobreajuste – Accuracy Train vs Test",
+       subtitle = "Una diferencia pequeña indica ausencia de sobreajuste",
+       x = NULL, y = "Accuracy (%)", fill = "Conjunto") +
+  theme_minimal()
+```
+
+El análisis de sobreajuste confirma que ninguno de los dos modelos presenta
+sobreajuste significativo. El Modelo 1 obtuvo 59.54% en entrenamiento y
+58.51% en prueba, una diferencia de apenas 1.03 puntos porcentuales. El
+Modelo 2 mostró la brecha más pequeña: 59.30% en entrenamiento y 59.02% en
+prueba, una diferencia de solo 0.28 puntos porcentuales.
+
+# 8. Para el modelo elegido de clasificación tunee los parámetros y discuta si puede mejorar todavía el modelo sin llegar a sobre ajustarlo.
+```{r}
+
+
+grid_tuning <- expand.grid(
+  size  = c(5, 10, 15, 20), 
+  decay = c(0.001, 0.01, 0.1, 0.5)  
+)
+
+ctrl_tuning <- trainControl(method  = "cv",
+                            number  = 10,
+                            verbose = FALSE)
+
+set.seed(123)
+modelo_tuned <- train(precio_cat ~ .,
+                      data      = train_rna_m,
+                      method    = "nnet",
+                      trControl = ctrl_tuning,
+                      tuneGrid  = grid_tuning,
+                      trace     = FALSE,
+                      maxit     = 300)
+
+cat("=== Resultados del Tuning ===\n")
+print(modelo_tuned)
+cat("\n=== Mejor combinación de parámetros ===\n")
+print(modelo_tuned$bestTune)
+
+
+plot(modelo_tuned,
+     main = "Tuning RNA – Accuracy por size y decay")
+```
+El proceso de tuning exploró 16 combinaciones de parámetros mediante validación cruzada de 10 pliegues.
+La mejor combinación encontrada fue size=15 y decay=0.1, con un Accuracy CV de
+58.90% y Kappa de 0.3824, superando al Modelo 2 original (size=10, decay=0.1)
+que obtuvo 58.48% y Kappa de 0.3800 en CV.
+
+La mejora obtenida con el tuning es real pero modesta: apenas 0.42 puntos
+porcentuales de Accuracy sobre el modelo original. Esto sugiere que la
+arquitectura de red neuronal está cerca de su techo de desempeño para este
+conjunto de datos, y que la limitación principal no es la topología sino las
+variables predictoras disponibles. Para mejorar sustancialmente el modelo
+sería necesario incorporar nuevas variables como ubicación, tipo de propiedad
+o características del anfitrión, más que seguir ajustando size y decay.
 
