@@ -151,7 +151,7 @@ print(modelo_rna2)
 ```
 El segundo modelo de RNA fue construido usando caret con method="nnet" y validación cruzada de 10 pliegues, lo que lo hace más robusto que el modelo 1 al evaluar su desempeño en diferentes subconjuntos de los datos. La arquitectura utilizada es 5-10-3 que son 5 variables de entrada, 1 capa oculta con 10 neuronas (el doble que el modelo 1) y 3 neuronas de salida con función softmax para clasificación multiclase. Se usó un decay de 0.1, una regularización más fuerte que el modelo 1 (5e-4), para compensar la mayor complejidad de la red y evitar sobreajuste. Con 300 iteraciones máximas el modelo tuvo más oportunidades de converger que el anterior. Los resultados de la validación cruzada muestran un Accuracy de 58.74% y un Kappa de 0.3800, métricas que servirán de referencia para comparar con el modelo 1 en la actividad siguiente.
 
-# Actividad 4: Predicciones con ambos modelos
+# Predicciones con ambos modelos
 
 ```{r rna-predicciones}
 
@@ -173,7 +173,7 @@ cat(sprintf("Modelo 2 (10 neuronas, decay=0.1) : %.2f%%\n", acc_rna2))
 ```
 Ambos modelos muestran un desempeño similar sobre el conjunto de prueba. El Modelo 2 con 10 neuronas y decay=0.1 obtuvo el mejor Accuracy con 59.02%, superando ligeramente al Modelo 1 con 5 neuronas y decay=5e-4 que alcanzó 58.51%. La diferencia de apenas 0.51 puntos porcentuales indica que duplicar el número de neuronas no generó una mejora sustancial, lo que sugiere que la limitación no está en la capacidad de la red sino en las variables disponibles. Ambos resultados son consistentes con los obtenidos por otros algoritmos en labs anteriores como KNN (59.37%) y SVM Tuneado (58.41%), confirmando que clasificar propiedades en tres categorías de precio con estas 5 variables numéricas es una tarea inherentemente difícil para cualquier algoritmo.
 
-# Actividad 5: Matrices de confusión
+# Matrices de confusión
 
 ```{r rna-confusion-m1}
 
@@ -216,7 +216,7 @@ Ambos modelos comparten el mismo patrón de errores observado en todos los algor
 
 Desde la perspectiva de SmartStay Advisors, el error más grave en ambos modelos es clasificar propiedades caras como baratas: el Modelo 1 comete 346 de estos errores y el Modelo 2 también 346, un número idéntico que sugiere que ambas arquitecturas tienen dificultades similares en ese segmento específico del mercado.
 
-# Actividad 6: Comparación entre los 2 modelos RNA
+# Comparación entre los 2 modelos RNA
 
 ```{r rna-comparacion}
 
@@ -283,7 +283,7 @@ En cuanto al tiempo de procesamiento, el Modelo 1 es considerablemente más efic
 
 El Modelo 2 es el elegido como mejor modelo por su mayor Accuracy y Kappa, aunque su ventaja sobre el Modelo 1 es marginal. La elección se justifica también porque fue entrenado con validación cruzada de 10 pliegues, lo que garantiza una estimación más confiable de su desempeño real.
 
-# 7. Analice si no hay sobreajuste en los modelos.
+# Analice si no hay sobreajuste en los modelos.
 ```{r}
 pred_train_rna1 <- predict(modelo_rna1, newdata = train_rna_m, type = "raw")
 pred_train_rna1 <- apply(pred_train_rna1, 1,
@@ -339,7 +339,7 @@ sobreajuste significativo. El Modelo 1 obtuvo 59.54% en entrenamiento y
 Modelo 2 mostró la brecha más pequeña: 59.30% en entrenamiento y 59.02% en
 prueba, una diferencia de solo 0.28 puntos porcentuales.
 
-# 8. Para el modelo elegido de clasificación tunee los parámetros y discuta si puede mejorar todavía el modelo sin llegar a sobre ajustarlo.
+# Para el modelo elegido de clasificación tunee los parámetros y discuta si puede mejorar todavía el modelo sin llegar a sobre ajustarlo.
 ```{r}
 
 
@@ -382,4 +382,23 @@ conjunto de datos, y que la limitación principal no es la topología sino las
 variables predictoras disponibles. Para mejorar sustancialmente el modelo
 sería necesario incorporar nuevas variables como ubicación, tipo de propiedad
 o características del anfitrión, más que seguir ajustando size y decay.
+
+# Variable respuesta = precio (regresión)
+```{r rna-regresion-prep}
+# Usar train_modelo y test_modelo directamente (ya tienen price)
+
+# Muestra reducida para RNA regresión
+set.seed(123)
+idx_reg     <- sample(nrow(train_modelo), 5000)
+train_reg_rna <- train_modelo[idx_reg, ]
+
+cat("=== Datos para RNA Regresión ===\n")
+cat("Filas entrenamiento (muestra):", nrow(train_reg_rna), "\n")
+cat("Filas prueba:                 ", nrow(test_modelo),   "\n")
+
+cat("\nResumen variable respuesta (price):\n")
+summary(train_reg_rna$price)
+```
+Para la tarea de regresión se utilizará el precio por noche directamente como variable respuesta continua, a diferencia de las actividades anteriores donde se trabajó con categorías. La muestra de entrenamiento contiene 5,000 observaciones y el conjunto de prueba completo de 12,173, manteniendo consistencia con todos los labs anteriores. El resumen estadístico muestra que los precios van de 9 a 999 por noche, con una mediana de 179 y una media de 228.4, lo que indica una distribución sesgada a la derecha donde propiedades de precio muy alto elevan el promedio por encima de la mediana. Este rango amplio de precios representa un desafío para las redes neuronales de regresión, ya que deben aprender a predecir tanto propiedades económicas como propiedades de lujo con las mismas 5 variables predictoras.
+
 
