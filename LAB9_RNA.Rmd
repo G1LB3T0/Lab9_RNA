@@ -485,3 +485,60 @@ cat(sprintf("R²   :  %.4f\n",  r2_reg2))
 ```
 El segundo modelo amplía la arquitectura a 5-10-1: mismas entradas pero con 10 neuronas en la capa oculta, entrenado con validación cruzada de 10 pliegues y mayor regularización (decay=0.1). El RMSE en validación cruzada fue de 0.1324 en escala normalizada, equivalente a 131.56 al desnormalizar, con MAE de 90.93 y R² de 0.4075. La diferencia respecto al Modelo 1 es mínima: apenas $0.11 de mejora en RMSE y 0.0009 en R², lo que indica que duplicar las neuronas no aportó una mejora sustancial. Sin embargo el Modelo 2 es el elegido por su mayor R² y por haber sido validado con CV de 10 pliegues, lo que garantiza una estimación más confiable de su desempeño real.
 
+
+# Comparación entre los 2 modelos de regresión RNA
+```{r rna-reg-comparacion}
+comparacion_reg_rna <- data.frame(
+  Modelo = c("RNA Reg. Modelo 1 (5 neuronas, decay=5e-4)",
+             "RNA Reg. Modelo 2 (10 neuronas, decay=0.1)"),
+  RMSE   = c(131.67, 131.56),
+  MAE    = c(90.87,  90.93),
+  R2     = c(0.4066, 0.4075)
+)
+
+print(comparacion_reg_rna)
+
+# Gráfico RMSE
+ggplot(comparacion_reg_rna,
+       aes(x = Modelo, y = RMSE, fill = Modelo)) +
+  geom_col(show.legend = FALSE, width = 0.5) +
+  geom_text(aes(label = paste0("$", RMSE)),
+            vjust = -0.5, fontface = "bold") +
+  ylim(0, 160) +
+  labs(title    = "Comparación de RMSE – Modelos RNA Regresión",
+       subtitle = "Menor RMSE = mejor predicción del precio",
+       x = NULL, y = "RMSE (USD)") +
+  theme_minimal()
+
+# Gráfico Real vs Predicho del mejor modelo (Modelo 2)
+df_reg <- data.frame(
+  Real     = test_modelo$price,
+  Predicho = pred_reg2
+)
+
+ggplot(df_reg, aes(x = Real, y = Predicho)) +
+  geom_point(alpha = 0.2, color = "#1565C0", size = 0.8) +
+  geom_abline(slope = 1, intercept = 0,
+              color = "red", linewidth = 1,
+              linetype = "dashed") +
+  coord_cartesian(xlim = c(0, 800), ylim = c(0, 800)) +
+  labs(title    = "RNA Regresión Modelo 2 – Precio Real vs Predicho",
+       subtitle = paste0("RMSE = $131.56 | R² = 0.4075"),
+       x = "Precio Real (USD/noche)",
+       y = "Precio Predicho (USD/noche)") +
+  theme_minimal()
+
+# Gráfico de residuos
+df_reg$Residuo <- df_reg$Real - df_reg$Predicho
+
+ggplot(df_reg, aes(x = Predicho, y = Residuo)) +
+  geom_point(alpha = 0.2, color = "#E53935", size = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed",
+             color = "black", linewidth = 0.8) +
+  labs(title    = "Gráfico de Residuos – RNA Regresión Modelo 2",
+       subtitle = "Residuos deben distribuirse aleatoriamente alrededor de 0",
+       x = "Precio Predicho (USD/noche)",
+       y = "Residuo (Real − Predicho)") +
+  theme_minimal()
+```
+La comparación entre los dos modelos de regresión RNA muestra resultados prácticamente idénticos. El Modelo 2 (10 neuronas, decay=0.1) obtuvo el mejor RMSE con 131.56 frente a 131.67 del Modelo 1, una diferencia de apenas 0.11 que es estadísticamente insignificante. En R² el Modelo 2 también supera ligeramente al Modelo 1 (0.4075 vs 0.4066). Por estas razones el Modelo 2 es el elegido como mejor modelo de regresión RNA, respaldado además por su validación cruzada de 10 pliegues que garantiza una estimación más confiable. El gráfico de Precio Real vs Predicho muestra que el modelo sigue el patrón esperado que es en el rango de precios bajos (0-200) las predicciones son bastante precisas con puntos cercanos a la línea roja de predicción perfecta. Sin embargo conforme el precio real aumenta, la nube de puntos se dispersa y el modelo tiende a subestimar las propiedades más caras, un patrón consistente con todos los algoritmos evaluados anteriormente. El gráfico de residuos confirma esta limitación de que los residuos no se distribuyen aleatoriamente alrededor de 0 sino que forman un patrón de abanico que se abre hacia la derecha, con residuos positivos crecientes a medida que aumenta el precio predicho. Esto indica un sesgo sistemático donde el modelo subestima consistentemente las propiedades de precio alto, lo cual es una consecuencia directa de que KNN, SVM y RNA promedian sus predicciones hacia el centro de la distribución cuando k o las neuronas no son suficientes para capturar los extremos.
