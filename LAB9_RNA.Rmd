@@ -542,3 +542,83 @@ ggplot(df_reg, aes(x = Predicho, y = Residuo)) +
   theme_minimal()
 ```
 La comparación entre los dos modelos de regresión RNA muestra resultados prácticamente idénticos. El Modelo 2 (10 neuronas, decay=0.1) obtuvo el mejor RMSE con 131.56 frente a 131.67 del Modelo 1, una diferencia de apenas 0.11 que es estadísticamente insignificante. En R² el Modelo 2 también supera ligeramente al Modelo 1 (0.4075 vs 0.4066). Por estas razones el Modelo 2 es el elegido como mejor modelo de regresión RNA, respaldado además por su validación cruzada de 10 pliegues que garantiza una estimación más confiable. El gráfico de Precio Real vs Predicho muestra que el modelo sigue el patrón esperado que es en el rango de precios bajos (0-200) las predicciones son bastante precisas con puntos cercanos a la línea roja de predicción perfecta. Sin embargo conforme el precio real aumenta, la nube de puntos se dispersa y el modelo tiende a subestimar las propiedades más caras, un patrón consistente con todos los algoritmos evaluados anteriormente. El gráfico de residuos confirma esta limitación de que los residuos no se distribuyen aleatoriamente alrededor de 0 sino que forman un patrón de abanico que se abre hacia la derecha, con residuos positivos crecientes a medida que aumenta el precio predicho. Esto indica un sesgo sistemático donde el modelo subestima consistentemente las propiedades de precio alto, lo cual es una consecuencia directa de que KNN, SVM y RNA promedian sus predicciones hacia el centro de la distribución cuando k o las neuronas no son suficientes para capturar los extremos.
+
+# Análisis de sobreajuste con curva de aprendizaje
+```{r rna-reg-sobreajuste}
+# Accuracy train vs test de ambos modelos
+pred_train_reg1 <- predict(modelo_reg1, newdata = train_reg_norm)
+pred_train_reg1 <- pred_train_reg1 * (price_max - price_min) + price_min
+
+pred_train_reg2 <- predict(modelo_reg2, newdata = train_reg_norm)
+pred_train_reg2 <- pred_train_reg2 * (price_max - price_min) + price_min
+
+rmse_train1 <- sqrt(mean((train_reg_rna$price - pred_train_reg1)^2))
+rmse_train2 <- sqrt(mean((train_reg_rna$price - pred_train_reg2)^2))
+
+cat("=== Comparación RMSE Train vs Test ===\n")
+sobreajuste_reg <- data.frame(
+  Modelo     = c("Modelo 1 (5 neuronas)", "Modelo 2 (10 neuronas)"),
+  RMSE_Train = round(c(rmse_train1, rmse_train2), 2),
+  RMSE_Test  = c(131.67, 131.56),
+  Diferencia = round(c(rmse_train1 - 131.67,
+                       rmse_train2 - 131.56), 2)
+)
+print(sobreajuste_reg)
+```
+
+```{r rna-reg-curva}
+# Curva de aprendizaje del Modelo 2 (mejor modelo)
+set.seed(123)
+tamanos    <- seq(0.1, 1.0, by = 0.1)
+rmse_tr_v  <- numeric(length(tamanos))
+rmse_te_v  <- numeric(length(tamanos))
+
+for (i in seq_along(tamanos)) {
+  n_sub <- floor(tamanos[i] * nrow(train_reg_norm))
+  idx   <- sample(1:nrow(train_reg_norm), n_sub)
+  sub   <- train_reg_norm[idx, ]
+
+  mod_tmp <- nnet(price ~ ., data = sub,
+                  size   = 10,
+                  decay  = 0.1,
+                  maxit  = 300,
+                  linout = TRUE,
+                  trace  = FALSE)
+
+  p_tr <- predict(mod_tmp, newdata = sub) *
+          (price_max - price_min) + price_min
+  p_te <- predict(mod_tmp, newdata = test_reg_norm) *
+          (price_max - price_min) + price_min
+
+  rmse_tr_v[i] <- sqrt(mean((sub$price *
+                   (price_max - price_min) + price_min - p_tr)^2))
+  rmse_te_v[i] <- sqrt(mean((test_modelo$price - p_te)^2))
+}
+
+df_curva <- data.frame(
+  Tamano        = floor(tamanos * nrow(train_reg_norm)),
+  Entrenamiento = rmse_tr_v,
+  Prueba        = rmse_te_v
+) %>%
+  pivot_longer(cols      = c(Entrenamiento, Prueba),
+               names_to  = "Conjunto",
+               values_to = "RMSE")
+
+ggplot(df_curva, aes(x = Tamano, y = RMSE,
+                     color = Conjunto)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_color_manual(values = c("Entrenamiento" = "#1565C0",
+                                "Prueba"        = "#E53935")) +
+  labs(title    = "Curva de Aprendizaje – RNA Regresión Modelo 2",
+       subtitle = "Convergencia de curvas indica ausencia de sobreajuste",
+       x = "Tamaño del conjunto de entrenamiento",
+       y = "RMSE (USD)",
+       color = "Conjunto") +
+  theme_minimal()
+```
+El análisis de sobreajuste muestra resultados interesantes. La tabla comparativa revela que ambos modelos tienen un RMSE ligeramente menor en entrenamiento que en prueba: el Modelo 1 tiene una diferencia de -1.94 (RMSE train 129.73 vs test 131.67) y el Modelo 2 de -2.83 (RMSE train 128.73 vs test 131.56). Las diferencias negativas indican que el modelo rinde marginalmente mejor en entrenamiento que en prueba, lo cual es completamente normal y esperado. Sin embargo estas diferencias son muy pequeñas y no representan sobreajuste problemático.
+
+La curva de aprendizaje del Modelo 2 confirma este diagnóstico visualmente. Con muestras pequeñas (500-1,000 observaciones) la curva de prueba (roja) está muy por encima de la de entrenamiento (azul), lo que indica alta varianza con pocos datos. A medida que el tamaño del conjunto de entrenamiento aumenta, ambas curvas convergen progresivamente: la curva de prueba desciende de ~138 a ~132 mientras que la de entrenamiento sube de ~117 hasta estabilizarse alrededor de 128-129. A partir de las 2,000 observaciones ambas curvas se estabilizan y mantienen una brecha pequeña y constante de aproximadamente 2-3, lo que es una señal clara de ausencia de sobreajuste. La estabilización de ambas curvas también sugiere que agregar más datos de entrenamiento no mejoraría significativamente el modelo, reforzando la conclusión de que la limitación real está en las variables predictoras disponibles.
+
+
