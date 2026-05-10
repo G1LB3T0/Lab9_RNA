@@ -401,4 +401,87 @@ summary(train_reg_rna$price)
 ```
 Para la tarea de regresión se utilizará el precio por noche directamente como variable respuesta continua, a diferencia de las actividades anteriores donde se trabajó con categorías. La muestra de entrenamiento contiene 5,000 observaciones y el conjunto de prueba completo de 12,173, manteniendo consistencia con todos los labs anteriores. El resumen estadístico muestra que los precios van de 9 a 999 por noche, con una mediana de 179 y una media de 228.4, lo que indica una distribución sesgada a la derecha donde propiedades de precio muy alto elevan el promedio por encima de la mediana. Este rango amplio de precios representa un desafío para las redes neuronales de regresión, ya que deben aprender a predecir tanto propiedades económicas como propiedades de lujo con las mismas 5 variables predictoras.
 
+# Modelo 1 de regresión RNA
+```{r rna-reg-modelo1}
+# Topología: 1 capa oculta con 5 neuronas
+# Función de activación: logística
+# Variable respuesta normalizada (necesario para nnet en regresión)
+
+# Normalizar price para regresión con nnet
+price_min <- min(train_reg_rna$price)
+price_max <- max(train_reg_rna$price)
+
+train_reg_norm <- train_reg_rna %>%
+  mutate(price = (price - price_min) / (price_max - price_min))
+
+test_reg_norm <- test_modelo %>%
+  mutate(price = (price - price_min) / (price_max - price_min))
+
+# Modelo 1: 1 capa oculta, 5 neuronas, logística
+set.seed(123)
+modelo_reg1 <- nnet(price ~ .,
+                    data    = train_reg_norm,
+                    size    = 5,
+                    decay   = 5e-4,
+                    maxit   = 200,
+                    linout  = TRUE,   # linout=TRUE para regresión
+                    trace   = FALSE)
+
+cat("=== Modelo Regresión 1 – nnet (5 neuronas, logística) ===\n")
+print(modelo_reg1)
+
+# Predicciones desnormalizadas
+pred_reg1_norm <- predict(modelo_reg1, newdata = test_reg_norm)
+pred_reg1      <- pred_reg1_norm * (price_max - price_min) + price_min
+
+# Métricas
+rmse_reg1 <- sqrt(mean((test_modelo$price - pred_reg1)^2))
+mae_reg1  <- mean(abs(test_modelo$price - pred_reg1))
+r2_reg1   <- cor(test_modelo$price, pred_reg1)^2
+
+cat(sprintf("\nRMSE : $%.2f\n", rmse_reg1))
+cat(sprintf("MAE  : $%.2f\n",  mae_reg1))
+cat(sprintf("R²   :  %.4f\n",  r2_reg1))
+```
+El primer modelo de RNA para regresión utiliza una arquitectura 5-5-1, es decir 5 variables de entrada, 1 capa oculta con 5 neuronas y 1 neurona de salida que predice el precio directamente. El modelo tiene 36 pesos a entrenar y usa linout=TRUE que activa una función de activación lineal en la capa de salida, lo cual es obligatorio en regresión ya que permite predecir valores continuos sin restricción de rango, a diferencia de la función logística que acota las salidas entre 0 y 1. Con decay=5e-4 y 200 iteraciones el modelo obtuvo un RMSE de 131.67, MAE de 90.87 y R² de 0.4066, lo que significa que explica el 40.66% de la variabilidad del precio con un error promedio de casi 91 por noche.
+
+# # Modelo 2: 1 capa oculta con 10 neuronas, CV 10-fold
+```{r rna-reg-modelo2}
+# Función de activación: logística con mayor regularización
+ctrl_reg_rna <- trainControl(method  = "cv",
+                             number  = 10,
+                             verbose = FALSE)
+
+grid_reg_rna <- expand.grid(
+  size  = 10,
+  decay = 0.1
+)
+
+set.seed(123)
+modelo_reg2 <- train(price ~ .,
+                     data       = train_reg_norm,
+                     method     = "nnet",
+                     trControl  = ctrl_reg_rna,
+                     tuneGrid   = grid_reg_rna,
+                     linout     = TRUE,   # regresión
+                     trace      = FALSE,
+                     maxit      = 300)
+
+cat("=== Modelo Regresión 2 – caret nnet (10 neuronas, CV 10-fold) ===\n")
+print(modelo_reg2)
+
+# Predicciones desnormalizadas
+pred_reg2_norm <- predict(modelo_reg2, newdata = test_reg_norm)
+pred_reg2      <- pred_reg2_norm * (price_max - price_min) + price_min
+
+# Métricas
+rmse_reg2 <- sqrt(mean((test_modelo$price - pred_reg2)^2))
+mae_reg2  <- mean(abs(test_modelo$price - pred_reg2))
+r2_reg2   <- cor(test_modelo$price, pred_reg2)^2
+
+cat(sprintf("\nRMSE : $%.2f\n", rmse_reg2))
+cat(sprintf("MAE  : $%.2f\n",  mae_reg2))
+cat(sprintf("R²   :  %.4f\n",  r2_reg2))
+```
+El segundo modelo amplía la arquitectura a 5-10-1: mismas entradas pero con 10 neuronas en la capa oculta, entrenado con validación cruzada de 10 pliegues y mayor regularización (decay=0.1). El RMSE en validación cruzada fue de 0.1324 en escala normalizada, equivalente a 131.56 al desnormalizar, con MAE de 90.93 y R² de 0.4075. La diferencia respecto al Modelo 1 es mínima: apenas $0.11 de mejora en RMSE y 0.0009 en R², lo que indica que duplicar las neuronas no aportó una mejora sustancial. Sin embargo el Modelo 2 es el elegido por su mayor R² y por haber sido validado con CV de 10 pliegues, lo que garantiza una estimación más confiable de su desempeño real.
 
