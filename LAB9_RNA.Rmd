@@ -621,4 +621,61 @@ El análisis de sobreajuste muestra resultados interesantes. La tabla comparativ
 
 La curva de aprendizaje del Modelo 2 confirma este diagnóstico visualmente. Con muestras pequeñas (500-1,000 observaciones) la curva de prueba (roja) está muy por encima de la de entrenamiento (azul), lo que indica alta varianza con pocos datos. A medida que el tamaño del conjunto de entrenamiento aumenta, ambas curvas convergen progresivamente: la curva de prueba desciende de ~138 a ~132 mientras que la de entrenamiento sube de ~117 hasta estabilizarse alrededor de 128-129. A partir de las 2,000 observaciones ambas curvas se estabilizan y mantienen una brecha pequeña y constante de aproximadamente 2-3, lo que es una señal clara de ausencia de sobreajuste. La estabilización de ambas curvas también sugiere que agregar más datos de entrenamiento no mejoraría significativamente el modelo, reforzando la conclusión de que la limitación real está en las variables predictoras disponibles.
 
+# Tuneo del Modelo 2 de regresión (el elegido)
+```{r rna-reg-tuneo}
+# Variar size y decay para encontrar la mejor combinación
 
+grid_reg_tuning <- expand.grid(
+  size  = c(5, 10, 15, 20),
+  decay = c(0.001, 0.01, 0.1, 0.5)
+)
+
+ctrl_reg_tuning <- trainControl(method  = "cv",
+                                number  = 10,
+                                verbose = FALSE)
+
+set.seed(123)
+modelo_reg_tuned <- train(
+  price ~ .,
+  data       = train_reg_norm,
+  method     = "nnet",
+  trControl  = ctrl_reg_tuning,
+  tuneGrid   = grid_reg_tuning,
+  linout     = TRUE,
+  trace      = FALSE,
+  maxit      = 300
+)
+
+cat("=== Resultados del Tuning – RNA Regresión ===\n")
+print(modelo_reg_tuned)
+cat("\n=== Mejor combinación de parámetros ===\n")
+print(modelo_reg_tuned$bestTune)
+
+plot(modelo_reg_tuned,
+     main = "Tuning RNA Regresión – RMSE por size y decay")
+
+# Predicciones con mejor modelo tuneado
+pred_tuned_reg_norm <- predict(modelo_reg_tuned,
+                               newdata = test_reg_norm)
+pred_tuned_reg <- pred_tuned_reg_norm *
+                  (price_max - price_min) + price_min
+
+rmse_tuned_reg <- sqrt(mean((test_modelo$price - pred_tuned_reg)^2))
+mae_tuned_reg  <- mean(abs(test_modelo$price - pred_tuned_reg))
+r2_tuned_reg   <- cor(test_modelo$price, pred_tuned_reg)^2
+
+cat("\n=== Comparación Modelo 2 vs Tuneado ===\n")
+comparacion_tuneo_reg <- data.frame(
+  Modelo = c("RNA Reg. Modelo 2 (size=10, decay=0.1)",
+             "RNA Reg. Tuneado  (mejor combinación)"),
+  RMSE   = round(c(131.56, rmse_tuned_reg), 2),
+  MAE    = round(c(90.93,  mae_tuned_reg),  2),
+  R2     = round(c(0.4075, r2_tuned_reg),   4)
+)
+print(comparacion_tuneo_reg)
+```
+El tuneo del modelo de regresión RNA exploró 16 combinaciones de parámetros (4 valores de size × 4 valores de decay) mediante validación cruzada de 10 pliegues. La mejor combinación encontrada fue size=5 y decay=0.01 con un RMSE normalizado de 0.1324 en CV, un resultado sorprendente ya que el modelo más simple (menos neuronas) resultó ser el mejor.
+
+El gráfico revela un patrón muy claro que conforme aumenta el número de neuronas el RMSE tiende a empeorar, especialmente con valores bajos de decay. Con size=20 y decay=0.001 el RMSE escala a 0.1378, el peor resultado de todos. Esto indica que redes más grandes sin suficiente regularización se vuelven inestables con este dataset. Los valores de decay=0.5 y decay=0.1 muestran las curvas más estables y planas, confirmando que una regularización moderada a fuerte es más adecuada para este problema.
+
+Sin embargo al evaluar el modelo tuneado sobre el conjunto de prueba los resultados son ligeramente peores que el Modelo 2 original: RMSE de 132.22 vs 131.56, MAE de 91.38 vs 90.93 y R² de 0.4014 vs 0.4075. Esto indica que el Modelo 2 original (size=10, decay=0.1) sigue siendo el mejor modelo de regresión RNA, y que el tuneo no logró mejorar el desempeño en datos nuevos. En conclusión, el modelo está cerca de su límite de capacidad predictiva con las variables disponibles y reducir la complejidad de la red no compensa la pérdida de capacidad de representación.
