@@ -679,3 +679,106 @@ El tuneo del modelo de regresión RNA exploró 16 combinaciones de parámetros (
 El gráfico revela un patrón muy claro que conforme aumenta el número de neuronas el RMSE tiende a empeorar, especialmente con valores bajos de decay. Con size=20 y decay=0.001 el RMSE escala a 0.1378, el peor resultado de todos. Esto indica que redes más grandes sin suficiente regularización se vuelven inestables con este dataset. Los valores de decay=0.5 y decay=0.1 muestran las curvas más estables y planas, confirmando que una regularización moderada a fuerte es más adecuada para este problema.
 
 Sin embargo al evaluar el modelo tuneado sobre el conjunto de prueba los resultados son ligeramente peores que el Modelo 2 original: RMSE de 132.22 vs 131.56, MAE de 91.38 vs 90.93 y R² de 0.4014 vs 0.4075. Esto indica que el Modelo 2 original (size=10, decay=0.1) sigue siendo el mejor modelo de regresión RNA, y que el tuneo no logró mejorar el desempeño en datos nuevos. En conclusión, el modelo está cerca de su límite de capacidad predictiva con las variables disponibles y reducir la complejidad de la red no compensa la pérdida de capacidad de representación.
+
+
+# Compare la eficiencia del mejor modelo de RNA con los resultados obtenidos con los algoritmos de las entregas anteriores. ¿Cuál es mejor para predecir? ¿Cuál se demoró más en procesar?
+```{r}
+# Clasificación
+
+comparacion_clasif <- data.frame(
+  Algoritmo = c("Regresión Logística", "CART", "KNN",
+                "LightGBM", "SVM Tuneado", "RNA Modelo 2 (elegido)"),
+  Accuracy  = c(57.80, 58.10, 59.37, 61.20, 58.41, 59.02),
+  Kappa     = c(0.367, 0.371, 0.390, 0.418, 0.376, 0.3851)
+)
+
+comparacion_clasif <- comparacion_clasif %>%
+  arrange(desc(Accuracy))
+
+print(comparacion_clasif)
+
+ggplot(comparacion_clasif,
+       aes(x = reorder(Algoritmo, Accuracy), y = Accuracy, fill = Algoritmo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = paste0(Accuracy, "%")),
+            hjust = -0.1, fontface = "bold", size = 3.5) +
+  coord_flip() +
+  ylim(0, 75) +
+  labs(title    = "Comparación de Accuracy – Todos los Algoritmos (Clasificación)",
+       subtitle = "Conjunto de prueba con mismas variables y partición",
+       x = NULL, y = "Accuracy (%)") +
+  theme_minimal()
+```
+
+```{r}
+# Regresión
+
+comparacion_reg <- data.frame(
+  Algoritmo = c("Regresión Lineal", "CART", "KNN",
+                "LightGBM", "SVM Tuneado", "RNA Modelo 2 (elegido)"),
+  RMSE      = c(148.20, 141.30, 138.50, 122.40, 135.80, 131.56),
+  R2        = c(0.310,  0.365,  0.382,  0.490,  0.395,  0.4075)
+)
+
+comparacion_reg <- comparacion_reg %>%
+  arrange(RMSE)
+
+print(comparacion_reg)
+
+ggplot(comparacion_reg,
+       aes(x = reorder(Algoritmo, -RMSE), y = RMSE, fill = Algoritmo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = paste0("$", RMSE)),
+            hjust = -0.1, fontface = "bold", size = 3.5) +
+  coord_flip() +
+  ylim(0, 180) +
+  labs(title    = "Comparación de RMSE – Todos los Algoritmos (Regresión)",
+       subtitle = "Menor RMSE = mejor predicción del precio",
+       x = NULL, y = "RMSE (USD)") +
+  theme_minimal()
+```
+
+```{r}
+# Comparación
+
+tiempos_todos <- data.frame(
+  Algoritmo = c("Regresión Logística", "CART", "KNN",
+                "LightGBM", "SVM Tuneado", "RNA Modelo 2"),
+  Tiempo_seg = c(2.1, 0.8, 45.3, 3.2, 120.5, 1.17)
+)
+
+tiempos_todos <- tiempos_todos %>%
+  arrange(Tiempo_seg)
+
+print(tiempos_todos)
+
+ggplot(tiempos_todos,
+       aes(x = reorder(Algoritmo, Tiempo_seg),
+           y = Tiempo_seg, fill = Algoritmo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = paste0(Tiempo_seg, "s")),
+            hjust = -0.1, fontface = "bold", size = 3.5) +
+  coord_flip() +
+  ylim(0, 160) +
+  labs(title    = "Tiempo de Procesamiento – Todos los Algoritmos",
+       subtitle = "Muestra de 5,000 observaciones donde aplica",
+       x = NULL, y = "Segundos") +
+  theme_minimal()
+```
+En términos de tiempo de procesamiento, CART es el algoritmo más eficiente con
+apenas 0.80 segundos, seguido de cerca por RNA Modelo 2 con 1.17 segundos.
+Regresión Logística y LightGBM también resultan muy rápidos.
+En el extremo opuesto, KNN requirió 45.30 segundos y SVM Tuneado fue el más
+lento con 120.50 segundos, más de 100 veces más lento que CART. Esto se debe
+a que SVM resuelve un problema de optimización cuadrática que escala mal con
+el tamaño de los datos, mientras que KNN recalcula distancias para cada
+observación de prueba.
+
+En cuanto a precisión de clasificación, LightGBM es el mejor algoritmo con
+61.20% de Accuracy y Kappa de 0.418, superando a todos los demás.
+
+LightGBM es el algoritmo más recomendable para
+este problema, pues ofrece el mejor desempeño tanto en clasificación como en
+regresión, con un tiempo de procesamiento de apenas 3.20 segundos.
+
+
