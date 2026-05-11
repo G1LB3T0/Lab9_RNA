@@ -843,4 +843,57 @@ recomendacion final sigue siendo LightGBM por su superioridad en precision,
 pero RNA representa la mejor alternativa cuando se requiere velocidad sin
 sacrificar demasiada exactitud.
 
+# Compare los resultados del mejor modelo para predecir el precio de venta con los resultados de los algoritmos usados para el mismo propósito de las entregas anteriores.
 
+```{r}
+
+
+comparacion_reg_final <- data.frame(
+  Algoritmo = c("Regresion Lineal", "CART", "KNN",
+                "LightGBM", "SVM Tuneado",
+                "RNA Modelo 2 (elegido)"),
+  RMSE      = c(148.20, 141.30, 138.50, 122.40, 135.80, 131.56),
+  MAE       = c(NA, NA, NA, NA, NA, 90.93),
+  R2        = c(0.310, 0.365, 0.382, 0.490, 0.395, 0.4075)
+)
+
+cat("=== Comparacion de Regresion - Todos los Algoritmos ===\n")
+print(comparacion_reg_final)
+
+
+ggplot(comparacion_reg_final,
+       aes(x = reorder(Algoritmo, -RMSE),
+           y = RMSE,
+           fill = Algoritmo == "RNA Modelo 2 (elegido)")) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = paste0("$", RMSE)),
+            hjust = -0.1, fontface = "bold", size = 3.5) +
+  coord_flip() +
+  ylim(0, 180) +
+  scale_fill_manual(values = c("TRUE" = "#E53935", "FALSE" = "#1565C0")) +
+  labs(title    = "Comparacion de RMSE - Regresion (Todos los Algoritmos)",
+       subtitle = "Menor RMSE = mejor prediccion | RNA Modelo 2 destacado en rojo",
+       x = NULL, y = "RMSE (USD)") +
+  theme_minimal()
+
+
+ggplot(comparacion_reg_final,
+       aes(x = reorder(Algoritmo, R2),
+           y = R2,
+           fill = Algoritmo == "RNA Modelo 2 (elegido)")) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = round(R2, 3)),
+            hjust = -0.1, fontface = "bold", size = 3.5) +
+  coord_flip() +
+  ylim(0, 0.65) +
+  scale_fill_manual(values = c("TRUE" = "#E53935", "FALSE" = "#1565C0")) +
+  labs(title    = "Comparacion de R2 - Regresion (Todos los Algoritmos)",
+       subtitle = "Mayor R2 = mejor ajuste | RNA Modelo 2 destacado en rojo",
+       x = NULL, y = "R2") +
+  theme_minimal()
+```
+LightGBM lidera en regresion con el menor RMSE y mayor R2, siendo el unico algoritmo que explica casi la mitad de la variabilidad del precio. RNA Modelo 2 ocupa el segundo lugar con RMSE de 131.56 y R2 de
+0.4075, superando a SVM Tuneado, KNN, CART y Regresion Lineal. 
+RNA Modelo 2 es la segunda mejor opcion para predecir el precio
+por noche, con un error promedio de 90.93 por noche (MAE) y explicando el
+40.75% de la variabilidad.
