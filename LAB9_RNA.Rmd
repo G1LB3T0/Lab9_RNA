@@ -781,4 +781,66 @@ LightGBM es el algoritmo más recomendable para
 este problema, pues ofrece el mejor desempeño tanto en clasificación como en
 regresión, con un tiempo de procesamiento de apenas 3.20 segundos.
 
+# Compare los resultados del mejor modelo de esta entrega para clasificar, con los resultados de los algoritmos usados para clasificar de las entregas anteriores.
+
+```{r}
+
+comparacion_clasif_final <- data.frame(
+  Algoritmo   = c("Regresión Logística", "CART", "KNN",
+                  "LightGBM", "SVM Tuneado",
+                  "RNA Modelo 2 (elegido)"),
+  Accuracy    = c(57.80, 58.10, 59.37, 61.20, 58.41, 59.02),
+  Kappa       = c(0.367, 0.371, 0.390, 0.418, 0.376, 0.385),
+  Sens_barata = c(NA, NA, NA, NA, NA, 67.72),
+  Sens_cara   = c(NA, NA, NA, NA, NA, 67.31),
+  Sens_media  = c(NA, NA, NA, NA, NA, 43.24)
+)
+
+cat("=== Comparación de Clasificación - Todos los Algoritmos ===\n")
+print(comparacion_clasif_final)
+
+# Gráfico de Accuracy
+ggplot(comparacion_clasif_final,
+       aes(x = reorder(Algoritmo, Accuracy),
+           y = Accuracy,
+           fill = Algoritmo == "RNA Modelo 2 (elegido)")) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = paste0(Accuracy, "%")),
+            hjust = -0.1, fontface = "bold", size = 3.5) +
+  coord_flip() +
+  ylim(0, 75) +
+  scale_fill_manual(values = c("TRUE" = "#E53935", "FALSE" = "#1565C0")) +
+  labs(title    = "Comparación de Accuracy – Clasificación (Todos los Algoritmos)",
+       subtitle = "RNA Modelo 2 destacado en rojo",
+       x = NULL, y = "Accuracy (%)") +
+  theme_minimal()
+
+
+ggplot(comparacion_clasif_final,
+       aes(x = reorder(Algoritmo, Kappa),
+           y = Kappa,
+           fill = Algoritmo == "RNA Modelo 2 (elegido)")) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = round(Kappa, 3)),
+            hjust = -0.1, fontface = "bold", size = 3.5) +
+  coord_flip() +
+  ylim(0, 0.55) +
+  scale_fill_manual(values = c("TRUE" = "#E53935", "FALSE" = "#1565C0")) +
+  labs(title    = "Comparación de Kappa – Clasificación (Todos los Algoritmos)",
+       subtitle = "RNA Modelo 2 destacado en rojo",
+       x = NULL, y = "Kappa") +
+  theme_minimal()
+```
+LightGBM es el mejor algoritmo de clasificacion con 61.20% de Accuracy y
+Kappa de 0.418, seguido por KNN (59.37%) y RNA Modelo 2 (59.02%), que ocupa
+el tercer lugar con apenas 0.35 puntos de diferencia respecto a KNN.
+
+Lo mas destacable de RNA Modelo 2 es su relacion entre precision y velocidad:
+con solo 1.17 segundos de procesamiento ofrece un Accuracy comparable al de
+KNN, que requirio 45.30 segundos, y supera a SVM Tuneado, que con 120.50
+segundos es el algoritmo mas lento del curso. Para SmartStay Advisors, la
+recomendacion final sigue siendo LightGBM por su superioridad en precision,
+pero RNA representa la mejor alternativa cuando se requiere velocidad sin
+sacrificar demasiada exactitud.
+
 
