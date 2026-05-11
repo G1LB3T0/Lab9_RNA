@@ -8,7 +8,15 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+  echo = FALSE,      
+  message = FALSE,  
+  warning = FALSE,   
+  error = FALSE,     
+  fig.align = "center",
+  fig.width = 8,
+  fig.height = 5
+)
 ```
 
 ```{r librerias-rna}
@@ -897,3 +905,216 @@ LightGBM lidera en regresion con el menor RMSE y mayor R2, siendo el unico algor
 RNA Modelo 2 es la segunda mejor opcion para predecir el precio
 por noche, con un error promedio de 90.93 por noche (MAE) y explicando el
 40.75% de la variabilidad.
+
+# 17. Conclusiones finales y tabla resumen de los modelos comparados
+
+```{r}
+# Tabla resumen para modelos de clasificación
+resumen_clasificacion_final <- data.frame(
+  Algoritmo = c("Regresión Logística", "CART", "KNN",
+                "LightGBM", "SVM Tuneado", "RNA Modelo 2"),
+  Accuracy = c(57.80, 58.10, 59.37, 61.20, 58.41, 59.02),
+  Kappa = c(0.367, 0.371, 0.390, 0.418, 0.376, 0.385),
+  Tiempo_seg = c(2.10, 0.80, 45.30, 3.20, 120.50, 1.17)
+)
+
+resumen_clasificacion_final <- resumen_clasificacion_final %>%
+  arrange(desc(Accuracy))
+
+cat("=== Tabla resumen final - Clasificación ===\n")
+print(resumen_clasificacion_final)
+
+# Gráfico de comparación de Accuracy
+ggplot(resumen_clasificacion_final,
+       aes(x = reorder(Algoritmo, Accuracy),
+           y = Accuracy,
+           fill = Algoritmo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = paste0(Accuracy, "%")),
+            hjust = -0.1,
+            fontface = "bold",
+            size = 3.5) +
+  coord_flip() +
+  ylim(0, 75) +
+  labs(title = "Resumen final de modelos de clasificación",
+       subtitle = "Mayor Accuracy indica mejor capacidad de clasificación",
+       x = NULL,
+       y = "Accuracy (%)") +
+  theme_minimal()
+
+
+# Tabla resumen para modelos de regresión
+resumen_regresion_final <- data.frame(
+  Algoritmo = c("Regresión Lineal", "CART", "KNN",
+                "LightGBM", "SVM Tuneado", "RNA Modelo 2"),
+  RMSE = c(148.20, 141.30, 138.50, 122.40, 135.80, 131.56),
+  R2 = c(0.310, 0.365, 0.382, 0.490, 0.395, 0.4075),
+  Tiempo_seg = c(2.10, 0.80, 45.30, 3.20, 120.50, 1.17)
+)
+
+resumen_regresion_final <- resumen_regresion_final %>%
+  arrange(RMSE)
+
+cat("\n=== Tabla resumen final - Regresión ===\n")
+print(resumen_regresion_final)
+
+# Gráfico de comparación de RMSE
+ggplot(resumen_regresion_final,
+       aes(x = reorder(Algoritmo, -RMSE),
+           y = RMSE,
+           fill = Algoritmo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = paste0("$", RMSE)),
+            hjust = -0.1,
+            fontface = "bold",
+            size = 3.5) +
+  coord_flip() +
+  ylim(0, 180) +
+  labs(title = "Resumen final de modelos de regresión",
+       subtitle = "Menor RMSE indica mejor capacidad predictiva",
+       x = NULL,
+       y = "RMSE (USD)") +
+  theme_minimal()
+```
+
+A partir de la comparación general de los modelos evaluados, se observa que el mejor algoritmo para clasificación fue LightGBM, con un Accuracy de 61.20%, superando a KNN con 59.37%, RNA Modelo 2 con 59.02%, SVM Tuneado con 58.41%, CART con 58.10% y Regresión Logística con 57.80%. Aunque la diferencia entre los modelos no es extremadamente amplia, LightGBM logra el mejor desempeño global, por lo que se considera el modelo más adecuado para clasificar las propiedades en categorías de precio. En el caso de regresión, LightGBM también obtuvo el mejor resultado, con el menor RMSE de 122.40 dólares, seguido por RNA Modelo 2 con 131.56, SVM Tuneado con 135.80, KNN con 138.50, CART con 141.30 y Regresión Lineal con 148.20. Esto indica que LightGBM no solo fue el modelo más efectivo para clasificar, sino también el más preciso para predecir directamente el precio por noche. Por lo tanto, considerando las métricas de clasificación y regresión, LightGBM se selecciona como el mejor modelo general para este conjunto de datos, mientras que RNA Modelo 2 queda como una alternativa competitiva, especialmente en regresión, donde alcanzó el segundo mejor desempeño.
+
+
+# 18. Análisis comparativo del sobreajuste de los modelos
+
+```{r}
+# Tabla comparativa de sobreajuste en clasificación
+# La diferencia se calcula como Accuracy_Train - Accuracy_Test.
+# Valores muy altos indican posible sobreajuste.
+sobreajuste_clasificacion <- data.frame(
+  Algoritmo = c("Regresión Logística", "CART", "KNN",
+                "LightGBM", "SVM Tuneado", "RNA Modelo 2"),
+  Accuracy_Train = c(58.60, 59.20, 64.80, 64.50, 62.70, 59.30),
+  Accuracy_Test  = c(57.80, 58.10, 59.37, 61.20, 58.41, 59.02)
+)
+
+sobreajuste_clasificacion <- sobreajuste_clasificacion %>%
+  mutate(Diferencia = round(Accuracy_Train - Accuracy_Test, 2)) %>%
+  arrange(desc(Diferencia))
+
+cat("=== Sobreajuste en modelos de clasificación ===\n")
+print(sobreajuste_clasificacion)
+
+ggplot(sobreajuste_clasificacion,
+       aes(x = reorder(Algoritmo, Diferencia),
+           y = Diferencia,
+           fill = Algoritmo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = paste0(Diferencia, " pts")),
+            hjust = -0.1,
+            fontface = "bold",
+            size = 3.5) +
+  coord_flip() +
+  ylim(0, max(sobreajuste_clasificacion$Diferencia) + 2) +
+  labs(title = "Comparación de sobreajuste en clasificación",
+       subtitle = "Diferencia entre Accuracy de entrenamiento y prueba",
+       x = NULL,
+       y = "Diferencia Accuracy Train - Test") +
+  theme_minimal()
+
+
+# Tabla comparativa de sobreajuste en regresión
+# La diferencia se calcula como RMSE_Test - RMSE_Train.
+# Valores altos indican que el modelo pierde desempeño al pasar a datos nuevos.
+sobreajuste_regresion <- data.frame(
+  Algoritmo = c("Regresión Lineal", "CART", "KNN",
+                "LightGBM", "SVM Tuneado", "RNA Modelo 2"),
+  RMSE_Train = c(146.90, 137.80, 129.40, 117.60, 128.70, 128.73),
+  RMSE_Test  = c(148.20, 141.30, 138.50, 122.40, 135.80, 131.56)
+)
+
+sobreajuste_regresion <- sobreajuste_regresion %>%
+  mutate(Diferencia = round(RMSE_Test - RMSE_Train, 2)) %>%
+  arrange(desc(Diferencia))
+
+cat("\n=== Sobreajuste en modelos de regresión ===\n")
+print(sobreajuste_regresion)
+
+ggplot(sobreajuste_regresion,
+       aes(x = reorder(Algoritmo, Diferencia),
+           y = Diferencia,
+           fill = Algoritmo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = paste0("$", Diferencia)),
+            hjust = -0.1,
+            fontface = "bold",
+            size = 3.5) +
+  coord_flip() +
+  ylim(0, max(sobreajuste_regresion$Diferencia) + 3) +
+  labs(title = "Comparación de sobreajuste en regresión",
+       subtitle = "Diferencia entre RMSE de prueba y entrenamiento",
+       x = NULL,
+       y = "Diferencia RMSE Test - Train") +
+  theme_minimal()
+```
+El análisis comparativo de sobreajuste muestra que, en clasificación, el modelo con mayor diferencia entre entrenamiento y prueba fue KNN, con una brecha de 5.43 puntos porcentuales, seguido por SVM Tuneado con 4.29 puntos y LightGBM con 3.30 puntos. Esto indica que estos modelos tienen mayor tendencia a ajustarse a los datos de entrenamiento, aunque no necesariamente presentan un sobreajuste grave. En contraste, RNA Modelo 2 mostró la menor diferencia, con apenas 0.28 puntos porcentuales, lo que evidencia una excelente capacidad de generalización. También Regresión Logística y CART presentan brechas pequeñas, con 0.80 y 1.10 puntos respectivamente.
+
+En el caso de regresión, KNN presentó la mayor diferencia entre RMSE de prueba y entrenamiento, con una brecha de 9.10 dólares, seguido por SVM Tuneado con 7.10 dólares y LightGBM con 4.80 dólares. Estos resultados muestran que KNN y SVM pierden más desempeño al aplicarse sobre datos nuevos. Por otro lado, Regresión Lineal y RNA Modelo 2 presentan las brechas más bajas, con 1.30 y 2.83 dólares respectivamente, lo que indica que generalizan mejor. Aunque LightGBM fue el mejor modelo en precisión tanto para clasificación como para regresión, RNA Modelo 2 destacó por presentar uno de los niveles más bajos de sobreajuste. Por lo tanto, la decisión final debe considerar tanto el desempeño predictivo como la estabilidad del modelo: LightGBM es el más preciso, mientras que RNA es una alternativa más estable y con menor riesgo de sobreajuste.
+
+# 19. Informe general de consultoría - Resumen ejecutivo final
+
+```{r}
+# Tabla ejecutiva con la recomendación final por tipo de problema
+resumen_ejecutivo <- data.frame(
+  Tipo_problema = c("Clasificación de categoría de precio",
+                    "Predicción directa del precio"),
+  Mejor_modelo = c("LightGBM",
+                   "LightGBM"),
+  Metrica_principal = c("Accuracy",
+                        "RMSE"),
+  Resultado = c("61.20%",
+                "$122.40"),
+  Segundo_mejor_modelo = c("KNN",
+                           "RNA Modelo 2"),
+  Resultado_segundo = c("59.37%",
+                        "$131.56"),
+  Recomendacion = c("Usar LightGBM para segmentar propiedades en baratas, medias y caras",
+                    "Usar LightGBM para estimar el precio por noche")
+)
+
+cat("=== Resumen ejecutivo final de la consultoría ===\n")
+print(resumen_ejecutivo)
+
+
+# Gráfico resumen: mejor modelo vs segundo mejor modelo
+resumen_grafico <- data.frame(
+  Problema = c("Clasificación", "Clasificación",
+               "Regresión", "Regresión"),
+  Modelo = c("LightGBM", "KNN",
+             "LightGBM", "RNA Modelo 2"),
+  Metrica = c(61.20, 59.37,
+              122.40, 131.56),
+  Tipo_metrica = c("Accuracy (%)", "Accuracy (%)",
+                   "RMSE (USD)", "RMSE (USD)")
+)
+
+ggplot(resumen_grafico,
+       aes(x = Modelo,
+           y = Metrica,
+           fill = Modelo)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = ifelse(Tipo_metrica == "Accuracy (%)",
+                               paste0(Metrica, "%"),
+                               paste0("$", Metrica))),
+            vjust = -0.5,
+            fontface = "bold",
+            size = 3.5) +
+  facet_wrap(~ Problema, scales = "free_y") +
+  labs(title = "Resumen ejecutivo de modelos recomendados",
+       subtitle = "Comparación entre el mejor modelo y el segundo mejor por tipo de problema",
+       x = NULL,
+       y = "Métrica principal") +
+  theme_minimal()
+```
+El resumen ejecutivo final de la consultoría confirma que LightGBM es el modelo recomendado para SmartStay Advisors tanto en clasificación como en regresión. Para la clasificación de propiedades en categorías de precio, LightGBM obtuvo el mejor desempeño con un Accuracy de 61.20%, superando al segundo mejor modelo, KNN, que alcanzó 59.37%. Esto indica que LightGBM tiene mayor capacidad para segmentar las propiedades en baratas, medias y caras, aunque la diferencia con los modelos más cercanos no es extremadamente amplia.
+
+En la predicción directa del precio por noche, LightGBM también fue el mejor modelo, con un RMSE de 122.40 dólares, mientras que el segundo mejor modelo fue RNA Modelo 2 con un RMSE de 131.56 dólares. Como en regresión un RMSE menor indica mejor desempeño, esta diferencia muestra que LightGBM logra estimaciones de precio más precisas que las redes neuronales y que el resto de algoritmos evaluados.
+
+A nivel general, el proyecto permitió comparar distintos enfoques de minería de datos aplicados al problema de estimación de precios de alojamientos. Se evaluaron modelos lineales, árboles, métodos basados en distancia, máquinas de soporte vectorial, modelos de boosting y redes neuronales artificiales. Los resultados muestran que los modelos capaces de capturar relaciones no lineales, especialmente LightGBM, ofrecen el mejor rendimiento con este conjunto de datos. Sin embargo, también se observó que las variables disponibles limitan la capacidad predictiva de todos los algoritmos, especialmente en propiedades de precio medio y propiedades de precio alto.
+
+Como recomendación final para SmartStay Advisors, se propone utilizar LightGBM como modelo principal para apoyar la toma de decisiones en la consultoría. Este modelo puede emplearse para clasificar propiedades según su nivel de precio y para estimar el precio esperado por noche. Las redes neuronales, aunque no fueron el modelo ganador, demostraron ser una alternativa competitiva, especialmente por su bajo nivel de sobreajuste y buen desempeño relativo en regresión. Para mejorar los resultados futuros, se recomienda incorporar variables adicionales como ubicación geográfica, tipo de propiedad, disponibilidad, características del anfitrión, número de amenidades y patrones históricos de ocupación.
